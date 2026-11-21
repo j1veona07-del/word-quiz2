@@ -1,0 +1,262 @@
+from IPython.display import HTML, display
+
+html_code = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>파이썬 기초 영단어 퀴즈 웹앱</title>
+<style>
+/* 전체 화면 배경 및 카드 레이아웃 디자인 */
+body {
+font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+display: flex;
+justify-content: center;
+align-items: center;
+height: 100vh;
+margin: 0;
+color: #333;
+}
+.quiz-container {
+background-color: #ffffff;
+width: 90%;
+max-width: 450px;
+padding: 30px;
+border-radius: 20px;
+box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+text-align: center;
+}
+h1 {
+font-size: 1.5rem;
+color: #4a5568;
+margin-bottom: 10px;
+}
+/* 진행도 바 (1주차 대비 개선 기능) */
+.progress-bar {
+width: 100%;
+height: 8px;
+background-color: #edf2f7;
+border-radius: 10px;
+overflow: hidden;
+margin-bottom: 20px;
+}
+.progress-fill {
+height: 100%;
+width: 0%;
+background-color: #667eea;
+transition: width 0.3s ease;
+}
+.status-text {
+font-size: 0.9rem;
+color: #718096;
+margin-bottom: 15px;
+}
+.word-box {
+background-color: #f7fafc;
+border: 2px solid #e2e8f0;
+border-radius: 12px;
+padding: 25px 15px;
+margin-bottom: 20px;
+}
+.word-text {
+font-size: 2.2rem;
+font-weight: bold;
+color: #2d3748;
+letter-spacing: 1px;
+}
+/* 입력창 및 버튼 디자인 */
+input[type="text"] {
+width: 100%;
+padding: 12px 15px;
+font-size: 1rem;
+border: 2px solid #cbd5e0;
+border-radius: 10px;
+box-sizing: border-box;
+margin-bottom: 12px;
+outline: none;
+transition: border-color 0.2s;
+}
+input[type="text"]:focus {
+border-color: #667eea;
+}
+button {
+width: 100%;
+padding: 12px;
+font-size: 1rem;
+font-weight: bold;
+color: white;
+background-color: #667eea;
+border: none;
+border-radius: 10px;
+cursor: pointer;
+transition: background-color 0.2s;
+}
+button:hover {
+background-color: #5a67d8;
+}
+.btn-restart {
+background-color: #48bb78;
+margin-top: 15px;
+}
+.btn-restart:hover {
+background-color: #38a169;
+}
+/* 피드백 메시지 영역 */
+.feedback {
+margin-top: 15px;
+font-weight: bold;
+font-size: 1rem;
+min-height: 24px;
+}
+.correct { color: #38a169; }
+.wrong { color: #e53e3e; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="quiz-container">
+<h1>🎯 기초 영단어 퀴즈</h1>
+
+<!-- 진행률 표시 바 -->
+<div class="progress-bar">
+<div class="progress-fill" id="progress-fill"></div>
+</div>
+
+<!-- 퀴즈 진행 화면 -->
+<div id="quiz-screen">
+<div class="status-text" id="status-text">문제 1 / 5</div>
+<div class="word-box">
+<div class="word-text" id="word-display">python</div>
+</div>
+<input type="text" id="answer-input" placeholder="한글 뜻을 입력하세요 (예: 파이썬)" autocomplete="off">
+<button id="submit-btn" onclick="checkAnswer()">정답 확인</button>
+<div class="feedback" id="feedback-msg"></div>
+</div>
+
+<!-- 최종 결과 화면 -->
+<div id="result-screen" class="hidden">
+<h2>📊 퀴즈 최종 결과</h2>
+<p id="final-score" style="font-size: 1.3rem; font-weight: bold; color: #4a5568;"></p>
+<p id="final-comment" style="color: #718096; margin-bottom: 20px;"></p>
+<button class="btn-restart" onclick="restartQuiz()">다시 풀기 🔄</button>
+</div>
+</div>
+
+<script>
+// 1주차 파이썬 프로그램의 단어 데이터베이스 유지
+const wordDatabase = [
+{ word: "python", meaning: "파이썬" },
+{ word: "variable", meaning: "변수" },
+{ word: "function", meaning: "함수" },
+{ word: "loop", meaning: "반복문" },
+{ word: "condition", meaning: "조건문" }
+];
+
+let currentIndex = 0;
+let score = 0;
+let isChecking = false;
+
+const wordDisplay = document.getElementById("word-display");
+const statusText = document.getElementById("status-text");
+const answerInput = document.getElementById("answer-input");
+const feedbackMsg = document.getElementById("feedback-msg");
+const progressFill = document.getElementById("progress-fill");
+const quizScreen = document.getElementById("quiz-screen");
+const resultScreen = document.getElementById("result-screen");
+
+// 문제 불러오기 함수
+function loadQuestion() {
+isChecking = false;
+const currentItem = wordDatabase[currentIndex];
+wordDisplay.textContent = currentItem.word;
+statusText.textContent = `문제 ${currentIndex + 1} / ${wordDatabase.length} (현재 점수: ${score}점)`;
+answerInput.value = "";
+feedbackMsg.textContent = "";
+feedbackMsg.className = "feedback";
+
+// 상단 진행도 바 업데이트
+const progressPercent = (currentIndex / wordDatabase.length) * 100;
+progressFill.style.width = `${progressPercent}%`;
+answerInput.focus();
+}
+
+// 정답 확인 함수
+function checkAnswer() {
+if (isChecking) return; // 중복 클릭 방지
+const userAnswer = answerInput.value.trim();
+
+if (userAnswer === "") {
+alert("정답을 입력해 주세요!");
+return;
+}
+
+isChecking = true;
+const correctAnswer = wordDatabase[currentIndex].meaning;
+
+if (userAnswer === correctAnswer) {
+score++;
+feedbackMsg.textContent = "🎉 정답입니다!";
+feedbackMsg.classList.add("correct");
+} else {
+feedbackMsg.textContent = `❌ 틀렸습니다. 정답은 '${correctAnswer}' 입니다.`;
+feedbackMsg.classList.add("wrong");
+}
+
+// 1.2초 후 다음 문제로 자동 전환
+setTimeout(() => {
+currentIndex++;
+if (currentIndex < wordDatabase.length) {
+loadQuestion();
+} else {
+showResult();
+}
+}, 1200);
+}
+
+// 최종 결과 출력 함수
+function showResult() {
+progressFill.style.width = "100%";
+quizScreen.classList.add("hidden");
+resultScreen.classList.remove("hidden");
+
+document.getElementById("final-score").textContent =
+`총 ${wordDatabase.length}문제 중 ${score}문제를 맞추셨습니다!`;
+
+const commentEl = document.getElementById("final-comment");
+if (score === wordDatabase.length) {
+commentEl.textContent = "🏆 완벽합니다! 모든 단어를 마스터하셨네요!";
+} else if (score >= wordDatabase.length / 2) {
+commentEl.textContent = "👍 잘하셨습니다! 조금만 더 복습하면 완벽해질 거예요.";
+} else {
+commentEl.textContent = "💪 아쉽네요. 아래 '다시 풀기' 버튼을 눌러 복습해 보세요!";
+}
+}
+
+// 퀴즈 초기화 및 다시 풀기 기능
+function restartQuiz() {
+currentIndex = 0;
+score = 0;
+resultScreen.classList.add("hidden");
+quizScreen.classList.remove("hidden");
+loadQuestion();
+}
+
+// 엔터(Enter) 키로 정답 제출 지원
+answerInput.addEventListener("keypress", function(event) {
+if (event.key === "Enter") {
+checkAnswer();
+}
+});
+
+// 프로그램 시작
+loadQuestion();
+</script>
+
+</body>
+</html>
+"""
+
+display(HTML(html_code))
